@@ -1,55 +1,56 @@
 use std::io;
 
 fn main() {
-    let test_result = process("test.txt");
-    assert_eq!(test_result, 281, "test input failed");
+    let test_result = solve("test.txt");
+    assert_eq!(test_result, 8, "test input failed");
 
-    let result = process("input.txt");
+    let result = solve("input.txt");
     println!("result: {result}");
 }
 
-fn process(path: &str) -> i32 {
-    let input = read_lines(path).unwrap();
-    let mut sum = 0;
-    for line in input {
-        let (first, last) = first_last_digit(&line.unwrap());
+fn limit_for_colour(colour: &str) -> Option<i32> {
+    static LIMITS: [(&str, i32); 3] = [("red", 12), ("green", 13), ("blue", 14)];
 
-        let this_line = first * 10 + last;
-        sum += this_line;
+    for l in LIMITS {
+        if l.0 == colour {
+            return Some(l.1);
+        }
     }
 
-    sum
+    None
 }
 
-fn first_last_digit(mut input: &str) -> (i32, i32) {
-    static INPUT_CHECKS: [(i32, &str, &str); 10] = [
-        (0, "0", "zero"),
-        (1, "1", "one"),
-        (2, "2", "two"),
-        (3, "3", "three"),
-        (4, "4", "four"),
-        (5, "5", "five"),
-        (6, "6", "six"),
-        (7, "7", "seven"),
-        (8, "8", "eight"),
-        (9, "9", "nine"),
-    ];
+fn solve(path: &str) -> i32 {
+    let input = read_lines(path).unwrap();
 
-    let mut first = None;
-    let mut last = None;
+    let mut solution = 0;
 
-    while !input.is_empty() {
-        for (val, digit_test, str_test) in INPUT_CHECKS {
-            if input.starts_with(digit_test) || input.starts_with(str_test) {
-                last = Some(val);
-                first = first.or(last);
+    for line in input {
+        let line = line.unwrap();
+        let (game_id, reveals) = line.split_once(':').unwrap();
+
+        let game_id: i32 = game_id.strip_prefix("Game ").unwrap().parse().unwrap();
+
+        let mut all_ok = true;
+
+        for reveal in reveals.split(';') {
+            for color in reveal.split(',') {
+                let (amount, color) = color.trim().split_once(' ').unwrap();
+                let amount: i32 = amount.parse().unwrap();
+
+                let limit = limit_for_colour(color).unwrap();
+                if amount > limit {
+                    all_ok = false;
+                }
             }
         }
 
-        input = &input[1..];
+        if all_ok {
+            solution += game_id;
+        }
     }
 
-    (first.unwrap(), last.unwrap())
+    solution
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
