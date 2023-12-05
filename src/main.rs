@@ -1,54 +1,63 @@
-use std::{
-    collections::{HashMap, HashSet},
-    io,
-};
+use std::io;
+
+use regex::Regex;
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 30, "test input failed");
+    assert_eq!(test_result, 35, "test input failed");
 
     let result = solve("input.txt");
     println!("result: {result}");
 }
 
-fn solve(path: &str) -> i32 {
-    let input = read_lines(path).unwrap();
+fn solve(path: &str) -> i64 {
+    let num_capture = Regex::new(r"(\d+) (\d+) (\d+)").unwrap();
 
-    let mut cards_count: HashMap<usize, i32> = HashMap::new();
-    let mut winning_numbers: HashSet<i32> = HashSet::with_capacity(20);
+    let mut input = read_lines(path).unwrap();
 
-    for (card_num, line) in input.enumerate() {
-        winning_numbers.clear();
+    let mut current_stage: Vec<i64> = {
+        // Read in seed list
+        let seeds_str = input.next().unwrap().unwrap();
+        let seeds_str = seeds_str.strip_prefix("seeds: ").unwrap();
 
-        let mut num_current_card = *cards_count.get(&card_num).unwrap_or(&0);
-        num_current_card += 1;
-        cards_count.insert(card_num, num_current_card);
+        seeds_str
+            .split_ascii_whitespace()
+            .map(|n| n.parse::<i64>().unwrap())
+            .collect()
+    };
 
+    let mut next_stage = current_stage.clone();
+
+    for line in input {
         let line = line.unwrap();
-        let after_card = line.split_once(':').unwrap().1;
-        let (winning, have) = after_card.split_once('|').unwrap();
 
-        for w in winning.split_whitespace() {
-            winning_numbers.insert(w.parse().unwrap());
+        if line.ends_with("map:") {
+            current_stage.clone_from(&next_stage);
+            continue;
         }
 
-        let mut bonus_card_amount = 0;
-        for a in have.split_whitespace() {
-            let num: i32 = a.parse().unwrap();
-            if winning_numbers.contains(&num) {
-                bonus_card_amount += 1;
+        let Some(digits) = num_capture.captures(&line) else {
+            assert!(line.is_empty());
+            continue;
+        };
+
+        let dest_start: i64 = digits[1].parse().unwrap();
+        let source_start: i64 = digits[2].parse().unwrap();
+        let range_len: i64 = digits[3].parse().unwrap();
+
+        let source = source_start..(source_start + range_len);
+
+        for (i, &v) in current_stage.iter().enumerate() {
+            if source.contains(&v) {
+                let offset = v - source_start;
+                next_stage[i] = dest_start + offset;
+                println!("{} to {}", v, dest_start + offset);
             }
-        }
-
-        for bonus_card in 0..bonus_card_amount {
-            let bonus_card_num = card_num + bonus_card + 1;
-
-            let current_count = *cards_count.get(&bonus_card_num).unwrap_or(&0);
-            cards_count.insert(bonus_card_num, current_count + num_current_card);
         }
     }
 
-    cards_count.values().sum()
+    dbg!(&next_stage);
+    *next_stage.iter().min().unwrap()
 }
 
 fn read_lines(filename: &str) -> io::Result<io::Lines<io::BufReader<std::fs::File>>> {
