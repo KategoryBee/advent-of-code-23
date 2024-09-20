@@ -53,82 +53,86 @@ impl Input {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Hand {
-    FiveOAK(Card),
-    FourOAK((Card, Card)),             // the four-of card, then the one-of card
-    FullHouse((Card, Card)),           // the three-of card, then then two-of
-    ThreeOfAKind((Card, Card, Card)),  // the three-of, the high one, then low one
-    TwoPair((Card, Card, Card)),       // the higher two-of, the lower two-of, then the one-of
-    OnePair((Card, Card, Card, Card)), // two-of, highest one-of to lowest
-    HighCard((Card, Card, Card, Card, Card)), // highest to lowest card
+enum HandType {
+    FiveOAK,
+    FourOAK,
+    FullHouse,
+    ThreeOfAKind,
+    TwoPair,
+    OnePair,
+    HighCard,
+}
+
+impl HandType {
+    fn strength(&self) -> i8 {
+        match self {
+            HandType::FiveOAK => 6,
+            HandType::FourOAK => 5,
+            HandType::FullHouse => 4,
+            HandType::ThreeOfAKind => 3,
+            HandType::TwoPair => 2,
+            HandType::OnePair => 1,
+            HandType::HighCard => 0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Hand {
+    cards: [Card; 5],
+    poker_type: HandType,
 }
 
 impl Hand {
     fn from_text(input: &str) -> Self {
         assert!(input.len() == 5);
 
-        let mut cards = Vec::with_capacity(5);
+        let mut cards = [Card::default(); 5];
+        let mut cards_histo = Vec::with_capacity(5);
 
-        for c in input.chars() {
+        for (i, c) in input.chars().enumerate() {
             let this_card = Card::from_char(c).unwrap();
+            cards[i] = this_card;
 
-            let existing = cards.iter_mut().find(|(_, card)| *card == this_card);
+            let existing = cards_histo.iter_mut().find(|(_, card)| *card == this_card);
             match existing {
                 Some((count, _)) => *count += 1,
-                None => cards.push((1, this_card)),
+                None => cards_histo.push((1, this_card)),
             }
         }
 
         // order by count, and then card value, highest to lowest (so descending order)
-        cards.sort_by(|a, b| b.cmp(a));
+        cards_histo.sort_by(|a, b| b.cmp(a));
 
-        match cards.as_slice() {
-            [(5, a)] => Hand::FiveOAK(*a),
-            [(4, a), (1, b)] => Hand::FourOAK((*a, *b)),
-            [(3, a), (2, b)] => Hand::FullHouse((*a, *b)),
-            [(3, a), (1, b), (1, c)] => Hand::ThreeOfAKind((*a, *b, *c)),
-            [(2, a), (2, b), (1, c)] => Hand::TwoPair((*a, *b, *c)),
-            [(2, a), (1, b), (1, c), (1, d)] => Hand::OnePair((*a, *b, *c, *d)),
-            [(1, a), (1, b), (1, c), (1, d), (1, e)] => Hand::HighCard((*a, *b, *c, *d, *e)),
+        let poker_type = match cards_histo.as_slice() {
+            [(5, _)] => HandType::FiveOAK,
+            [(4, _), (1, _)] => HandType::FourOAK,
+            [(3, _), (2, _)] => HandType::FullHouse,
+            [(3, _), (1, _), (1, _)] => HandType::ThreeOfAKind,
+            [(2, _), (2, _), (1, _)] => HandType::TwoPair,
+            [(2, _), (1, _), (1, _), (1, _)] => HandType::OnePair,
+            [(1, _), (1, _), (1, _), (1, _), (1, _)] => HandType::HighCard,
             _ => unreachable!(),
-        }
+        };
+
+        Self { cards, poker_type }
     }
 
     // stronger types (five of a kind) have higher strength values. Each enum value has a unique
     // strength
-    fn type_strength(&self) -> i8 {
-        match self {
-            Hand::FiveOAK(_) => 6,
-            Hand::FourOAK(_) => 5,
-            Hand::FullHouse(_) => 4,
-            Hand::ThreeOfAKind(_) => 3,
-            Hand::TwoPair(_) => 2,
-            Hand::OnePair(_) => 1,
-            Hand::HighCard(_) => 0,
-        }
-    }
 }
 
 impl Ord for Hand {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         // order by strength first. only need to check face values if strength is the same
-        let strength = self.type_strength().cmp(&other.type_strength());
+        let strength = self.poker_type.strength().cmp(&other.poker_type.strength());
         match strength {
             std::cmp::Ordering::Less => return std::cmp::Ordering::Less,
             std::cmp::Ordering::Greater => return std::cmp::Ordering::Greater,
             std::cmp::Ordering::Equal => (),
         };
 
-        match (self, other) {
-            (Hand::FiveOAK(l), Hand::FiveOAK(r)) => l.cmp(r),
-            (Hand::FourOAK(l), Hand::FourOAK(r)) => l.cmp(r),
-            (Hand::FullHouse(l), Hand::FullHouse(r)) => l.cmp(r),
-            (Hand::ThreeOfAKind(l), Hand::ThreeOfAKind(r)) => l.cmp(r),
-            (Hand::TwoPair(l), Hand::TwoPair(r)) => l.cmp(r),
-            (Hand::OnePair(l), Hand::OnePair(r)) => l.cmp(r),
-            (Hand::HighCard(l), Hand::HighCard(r)) => l.cmp(r),
-            _ => unreachable!(),
-        }
+        self.cards.cmp(&other.cards)
     }
 }
 
@@ -138,7 +142,7 @@ impl PartialOrd for Hand {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
 struct Card {
     // 13 values. 0 is card '2', 12 is 'Ace'
     val: u8,
