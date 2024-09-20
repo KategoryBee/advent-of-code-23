@@ -5,7 +5,7 @@ use std::{
 
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 6440, "test input failed");
+    assert_eq!(test_result, 5905, "test input failed");
 
     let result = solve("input.txt");
     println!("result: {result}");
@@ -64,6 +64,34 @@ enum HandType {
 }
 
 impl HandType {
+    fn from_cards(cards: &[Card; 5]) -> Self {
+        let mut cards_histo = [0u8; Card::COUNT];
+        let mut jokers = 0;
+
+        for c in cards {
+            if *c == Card::JOKER {
+                jokers += 1;
+            } else {
+                cards_histo[c.val as usize] += 1;
+            }
+        }
+
+        // order by reverse count. we only care about the 'shape' of the histogram.
+        cards_histo.sort_by(|a, b| b.cmp(a));
+        cards_histo[0] += jokers;
+
+        match cards_histo.as_slice() {
+            [5, ..] => HandType::FiveOAK,
+            [4, 1, ..] => HandType::FourOAK,
+            [3, 2, ..] => HandType::FullHouse,
+            [3, 1, 1, ..] => HandType::ThreeOfAKind,
+            [2, 2, 1, ..] => HandType::TwoPair,
+            [2, 1, 1, 1, ..] => HandType::OnePair,
+            [1, 1, 1, 1, 1, ..] => HandType::HighCard,
+            _ => unreachable!(),
+        }
+    }
+
     fn strength(&self) -> i8 {
         match self {
             HandType::FiveOAK => 6,
@@ -86,40 +114,15 @@ struct Hand {
 impl Hand {
     fn from_text(input: &str) -> Self {
         assert!(input.len() == 5);
-
         let mut cards = [Card::default(); 5];
-        let mut cards_histo = Vec::with_capacity(5);
 
         for (i, c) in input.chars().enumerate() {
-            let this_card = Card::from_char(c).unwrap();
-            cards[i] = this_card;
-
-            let existing = cards_histo.iter_mut().find(|(_, card)| *card == this_card);
-            match existing {
-                Some((count, _)) => *count += 1,
-                None => cards_histo.push((1, this_card)),
-            }
+            cards[i] = Card::from_char(c).unwrap();
         }
-
-        // order by count, and then card value, highest to lowest (so descending order)
-        cards_histo.sort_by(|a, b| b.cmp(a));
-
-        let poker_type = match cards_histo.as_slice() {
-            [(5, _)] => HandType::FiveOAK,
-            [(4, _), (1, _)] => HandType::FourOAK,
-            [(3, _), (2, _)] => HandType::FullHouse,
-            [(3, _), (1, _), (1, _)] => HandType::ThreeOfAKind,
-            [(2, _), (2, _), (1, _)] => HandType::TwoPair,
-            [(2, _), (1, _), (1, _), (1, _)] => HandType::OnePair,
-            [(1, _), (1, _), (1, _), (1, _), (1, _)] => HandType::HighCard,
-            _ => unreachable!(),
-        };
+        let poker_type = HandType::from_cards(&cards);
 
         Self { cards, poker_type }
     }
-
-    // stronger types (five of a kind) have higher strength values. Each enum value has a unique
-    // strength
 }
 
 impl Ord for Hand {
@@ -149,7 +152,9 @@ struct Card {
 }
 
 impl Card {
-    const CHARS: &[u8] = "123456789TJQKA".as_bytes();
+    const JOKER: Card = Card { val: 0 };
+    const CHARS: &[u8] = "J23456789TQKA".as_bytes();
+    const COUNT: usize = 13;
 
     fn from_char(input: char) -> Option<Self> {
         for (i, c) in Self::CHARS.iter().enumerate() {
