@@ -1,7 +1,7 @@
 use std::io;
 fn main() {
     let test_result = solve("test.txt");
-    assert_eq!(test_result, 114, "test input failed");
+    assert_eq!(test_result, 2, "test input failed");
     println!("Test passed");
 
     let result = solve("input.txt");
@@ -9,9 +9,16 @@ fn main() {
 }
 
 fn solve(path: &str) -> i64 {
-    let input = Input::parse(path);
+    let mut input = Input::parse(path);
 
-    input.puzzles.iter().map(|x| solve_step(&x.values)).sum()
+    input
+        .puzzles
+        .iter_mut()
+        .map(|x| {
+            x.values.reverse();
+            solve_step(&x.values)
+        })
+        .sum()
 }
 
 fn solve_step(input: &[i64]) -> i64 {
